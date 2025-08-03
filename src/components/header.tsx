@@ -17,7 +17,7 @@ const Header = () => {
       </Link>
       <div>
         <SignedOut>
-          <SignInButton mode="modal">
+          <SignInButton mode="modal" forceRedirectUrl="/">
             <Button>로그인</Button>
           </SignInButton>
         </SignedOut>
