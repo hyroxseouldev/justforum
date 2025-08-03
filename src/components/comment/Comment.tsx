@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { ko } from "date-fns/locale";
-import { MoreHorizontal, Reply, Heart, Flag } from "lucide-react";
+import { MoreHorizontal, Reply, Flag, Edit } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -17,6 +17,7 @@ import { Id } from "@/convex/_generated/dataModel";
 import { useUser } from "@clerk/nextjs";
 import { toast } from "sonner";
 import CommentInput from "./CommentInput";
+import CommentLikeButton from "./CommentLikeButton";
 
 interface CommentData {
   _id: Id<"comments">;
@@ -46,6 +47,7 @@ const Comment: React.FC<CommentProps> = ({
 }) => {
   const { user } = useUser();
   const [showReplyForm, setShowReplyForm] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
   const deleteComment = useMutation(api.comments.remove);
@@ -55,7 +57,11 @@ const Comment: React.FC<CommentProps> = ({
     locale: ko,
   });
 
-  const isAuthor = user?.id === comment.author.name; // Note: You might need to adjust this based on your user ID mapping
+  // Check if current user is the author of this comment
+  // Since we need to match Clerk user ID with Convex user, we can use a query or 
+  // compare using the user's full name or other available fields
+  const isAuthor = user?.fullName === comment.author.name || 
+                   user?.firstName + " " + user?.lastName === comment.author.name;
 
   const handleDelete = async () => {
     if (!confirm("댓글을 삭제하시겠습니까?")) return;
@@ -74,6 +80,14 @@ const Comment: React.FC<CommentProps> = ({
 
   const handleReplySubmit = () => {
     setShowReplyForm(false);
+  };
+
+  const handleEditSubmit = () => {
+    setIsEditing(false);
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditing(false);
   };
 
   // Maximum nesting depth to prevent excessive indentation
@@ -113,8 +127,15 @@ const Comment: React.FC<CommentProps> = ({
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-32">
                     <DropdownMenuItem
+                      onClick={() => setIsEditing(true)}
+                      disabled={isDeleting || isEditing}
+                    >
+                      <Edit className="w-3 h-3 mr-2" />
+                      수정
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
                       onClick={handleDelete}
-                      disabled={isDeleting}
+                      disabled={isDeleting || isEditing}
                       className="text-red-600 focus:text-red-600"
                     >
                       삭제
@@ -126,48 +147,58 @@ const Comment: React.FC<CommentProps> = ({
 
             {/* Comment content */}
             <div className="mb-3">
-              <p className="text-sm text-gray-700 leading-5 whitespace-pre-wrap">
-                {comment.content}
-              </p>
+              {isEditing ? (
+                <div className="mt-2">
+                  <CommentInput
+                    postId={postId}
+                    isEditMode={true}
+                    editCommentId={comment._id}
+                    editInitialContent={comment.content}
+                    onSubmitSuccess={handleEditSubmit}
+                    onCancelEdit={handleCancelEdit}
+                    autoFocus
+                    compact
+                  />
+                </div>
+              ) : (
+                <p className="text-sm text-gray-700 leading-5 whitespace-pre-wrap">
+                  {comment.content}
+                </p>
+              )}
             </div>
 
-            {/* Comment actions */}
-            <div className="flex items-center gap-3">
-              {!isMaxDepth && (
+            {/* Comment actions - Hide when editing */}
+            {!isEditing && (
+              <div className="flex items-center gap-3">
+                {!isMaxDepth && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowReplyForm(!showReplyForm)}
+                    className="h-7 px-2 text-xs text-gray-500 hover:text-gray-700"
+                  >
+                    <Reply className="w-3 h-3 mr-1" />
+                    답글
+                  </Button>
+                )}
+
+                <CommentLikeButton commentId={comment._id} />
+
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setShowReplyForm(!showReplyForm)}
                   className="h-7 px-2 text-xs text-gray-500 hover:text-gray-700"
                 >
-                  <Reply className="w-3 h-3 mr-1" />
-                  답글
+                  <Flag className="w-3 h-3 mr-1" />
+                  신고
                 </Button>
-              )}
-
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 px-2 text-xs text-gray-500 hover:text-gray-700"
-              >
-                <Heart className="w-3 h-3 mr-1" />
-                좋아요
-              </Button>
-
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 px-2 text-xs text-gray-500 hover:text-gray-700"
-              >
-                <Flag className="w-3 h-3 mr-1" />
-                신고
-              </Button>
-            </div>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Reply form */}
-        {showReplyForm && (
+        {/* Reply form - Hide when editing */}
+        {showReplyForm && !isEditing && (
           <div className="mt-4 ml-11">
             <CommentInput
               postId={postId}

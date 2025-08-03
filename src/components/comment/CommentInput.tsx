@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useMutation } from "convex/react";
@@ -8,7 +8,7 @@ import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { useUser } from "@clerk/nextjs";
 import { toast } from "sonner";
-import { Loader2, Send } from "lucide-react";
+import { Loader2, Send, X } from "lucide-react";
 
 interface CommentInputProps {
   postId: Id<"posts">;
@@ -17,6 +17,11 @@ interface CommentInputProps {
   onSubmitSuccess?: () => void;
   autoFocus?: boolean;
   compact?: boolean;
+  // Edit mode props
+  isEditMode?: boolean;
+  editCommentId?: Id<"comments">;
+  editInitialContent?: string;
+  onCancelEdit?: () => void;
 }
 
 const CommentInput: React.FC<CommentInputProps> = ({
@@ -26,12 +31,27 @@ const CommentInput: React.FC<CommentInputProps> = ({
   onSubmitSuccess,
   autoFocus = false,
   compact = false,
+  // Edit mode props
+  isEditMode = false,
+  editCommentId,
+  editInitialContent = "",
+  onCancelEdit,
 }) => {
   const { user, isSignedIn } = useUser();
-  const [content, setContent] = useState("");
+  const [content, setContent] = useState(isEditMode ? editInitialContent : "");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const createComment = useMutation(api.comments.create);
+  const updateComment = useMutation(api.comments.update);
+
+  // Update content when edit mode changes
+  useEffect(() => {
+    if (isEditMode && editInitialContent) {
+      setContent(editInitialContent);
+    } else if (!isEditMode) {
+      setContent("");
+    }
+  }, [isEditMode, editInitialContent]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,21 +71,33 @@ const CommentInput: React.FC<CommentInputProps> = ({
     try {
       setIsSubmitting(true);
 
-      await createComment({
-        content: content.trim(),
-        postId,
-        parentId,
-      });
-
-      setContent("");
-      toast.success(parentId ? "답글이 작성되었습니다." : "댓글이 작성되었습니다.");
+      if (isEditMode && editCommentId) {
+        // Edit existing comment
+        await updateComment({
+          commentId: editCommentId,
+          content: content.trim(),
+        });
+        toast.success("댓글이 수정되었습니다.");
+      } else {
+        // Create new comment
+        await createComment({
+          content: content.trim(),
+          postId,
+          parentId,
+        });
+        setContent("");
+        toast.success(parentId ? "답글이 작성되었습니다." : "댓글이 작성되었습니다.");
+      }
       
       if (onSubmitSuccess) {
         onSubmitSuccess();
       }
     } catch (error) {
-      toast.error("댓글 작성 중 오류가 발생했습니다.");
-      console.error("Comment creation error:", error);
+      const errorMessage = isEditMode 
+        ? "댓글 수정 중 오류가 발생했습니다." 
+        : "댓글 작성 중 오류가 발생했습니다.";
+      toast.error(errorMessage);
+      console.error("Comment operation error:", error);
     } finally {
       setIsSubmitting(false);
     }
@@ -116,17 +148,18 @@ const CommentInput: React.FC<CommentInputProps> = ({
           Ctrl + Enter로 빠른 작성
         </p>
         <div className="flex items-center gap-2">
-          {parentId && onSubmitSuccess && (
+          {(parentId && onSubmitSuccess) || (isEditMode && onCancelEdit) ? (
             <Button
               type="button"
               variant="ghost"
               size="sm"
-              onClick={onSubmitSuccess}
+              onClick={isEditMode ? onCancelEdit : onSubmitSuccess}
               disabled={isSubmitting}
             >
+              <X className="w-3 h-3 mr-1" />
               취소
             </Button>
-          )}
+          ) : null}
           <Button
             type="submit"
             size="sm"
@@ -136,12 +169,12 @@ const CommentInput: React.FC<CommentInputProps> = ({
             {isSubmitting ? (
               <>
                 <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                작성중
+                {isEditMode ? "수정중" : "작성중"}
               </>
             ) : (
               <>
                 <Send className="w-3 h-3 mr-1" />
-                {parentId ? "답글" : "댓글"}
+                {isEditMode ? "수정" : parentId ? "답글" : "댓글"}
               </>
             )}
           </Button>
