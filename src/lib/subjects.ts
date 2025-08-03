@@ -14,6 +14,12 @@ export const SUBJECT_IDS: Record<Subject, Id<"subjects">> = {
   [SUBJECTS.FEEDBACK]: "jn75r4nbsjmyqwmjs7knsax3eh7myk5m" as Id<"subjects">,
 };
 
+// subject id mappindg for production
+export const SUBJECT_IDS_PRODUCTION: Record<Subject, Id<"subjects">> = {
+  [SUBJECTS.QUESTION]: "jh75ndgsxh269gka48ntdxsn8d7mzjw2" as Id<"subjects">,
+  [SUBJECTS.FEEDBACK]: "jh7b0ktfcg11y7vn3kajrs08w97mymnz" as Id<"subjects">,
+};
+
 // Subject 정보 (UI에서 사용할 스타일 정보)
 export const SUBJECT_INFO = {
   [SUBJECTS.QUESTION]: {
