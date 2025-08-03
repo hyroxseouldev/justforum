@@ -17,22 +17,32 @@ interface Post {
     name: string;
   };
   likeCount: number;
+  isLiked: boolean;
+}
+
+interface PaginatedPosts {
+  page: Post[];
+  isDone: boolean;
+  continueCursor: string | null;
 }
 
 interface PostListProps {
-  posts: Post[];
+  posts: Post[] | PaginatedPosts;
 }
 
 export const PostList: React.FC<PostListProps> = ({ posts }) => {
+  // Handle both old format (Post[]) and new format (PaginatedPosts)
+  const postArray = Array.isArray(posts) ? posts : posts.page;
+
   return (
     <div className="">
-      {!posts || posts.length === 0 ? (
+      {!postArray || postArray.length === 0 ? (
         <div className="flex flex-col items-center justify-center p-4 min-h-[500px] gap-2">
           <h3>게시글이 없습니다.</h3>
           <p>게시글을 작성해주세요.</p>
         </div>
       ) : (
-        posts.map((post) => <PostItem key={post._id} {...post} />)
+        postArray.map((post) => <PostItem key={post._id} {...post} />)
       )}
     </div>
   );

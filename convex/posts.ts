@@ -2,59 +2,62 @@ import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
 import { api } from "./_generated/api";
+import { paginationOptsValidator } from "convex/server";
 
 /**
- * 모든 게시글 목록을 조회합니다.
+ * 모든 게시글 목록을 조회합니다. (페이지네이션 지원)
  */
 export const list = query({
   args: {
     subjectId: v.optional(v.id("subjects")),
     type: v.optional(v.union(v.literal("notice"), v.literal("general"))),
-    limit: v.optional(v.number()),
+    paginationOpts: paginationOptsValidator,
   },
-  returns: v.array(
-    v.object({
-      _id: v.id("posts"),
-      _creationTime: v.number(),
-      title: v.string(),
-      content: v.string(),
-      views: v.number(),
-      subjectId: v.id("subjects"),
-      type: v.union(v.literal("notice"), v.literal("general")),
-      authorId: v.id("users"),
-      author: v.object({
-        _id: v.id("users"),
-        name: v.string(),
-      }),
-      subject: v.object({
-        _id: v.id("subjects"),
-        name: v.string(),
-      }),
-      likeCount: v.number(),
-      isLiked: v.boolean(),
-    })
-  ),
+  returns: v.object({
+    page: v.array(
+      v.object({
+        _id: v.id("posts"),
+        _creationTime: v.number(),
+        title: v.string(),
+        content: v.string(),
+        views: v.number(),
+        subjectId: v.id("subjects"),
+        type: v.union(v.literal("notice"), v.literal("general")),
+        authorId: v.id("users"),
+        author: v.object({
+          _id: v.id("users"),
+          name: v.string(),
+        }),
+        subject: v.object({
+          _id: v.id("subjects"),
+          name: v.string(),
+        }),
+        likeCount: v.number(),
+        isLiked: v.boolean(),
+      })
+    ),
+    isDone: v.boolean(),
+    continueCursor: v.union(v.string(), v.null()),
+  }),
   handler: async (ctx, args) => {
-    let posts: any[];
+    let postsQuery;
 
     if (args.subjectId) {
-      posts = await ctx.db
+      postsQuery = ctx.db
         .query("posts")
         .withIndex("by_subject", (q) => q.eq("subjectId", args.subjectId!))
-        .order("desc")
-        .take(args.limit || 50);
+        .order("desc");
     } else if (args.type) {
-      posts = await ctx.db
+      postsQuery = ctx.db
         .query("posts")
         .withIndex("by_type", (q) => q.eq("type", args.type!))
-        .order("desc")
-        .take(args.limit || 50);
+        .order("desc");
     } else {
-      posts = await ctx.db
-        .query("posts")
-        .order("desc")
-        .take(args.limit || 50);
+      postsQuery = ctx.db.query("posts").order("desc");
     }
+
+    const postsResult = await postsQuery.paginate(args.paginationOpts);
+    const posts = postsResult.page;
 
     // 현재 사용자 정보 가져오기 (좋아요 상태 확인용)
     const identity = await ctx.auth.getUserIdentity();
@@ -111,7 +114,11 @@ export const list = query({
       })
     );
 
-    return postsWithDetails;
+    return {
+      page: postsWithDetails,
+      isDone: postsResult.isDone,
+      continueCursor: postsResult.continueCursor,
+    };
   },
 });
 
@@ -424,5 +431,223 @@ export const incrementViews = mutation({
 
     await ctx.db.patch(args.postId, { views: post.views + 1 });
     return null;
+  },
+});
+
+/**
+ * 모든 게시글 목록을 조회합니다. (기존 호환성을 위한 함수)
+ */
+export const listSimple = query({
+  args: {
+    subjectId: v.optional(v.id("subjects")),
+    type: v.optional(v.union(v.literal("notice"), v.literal("general"))),
+    limit: v.optional(v.number()),
+  },
+  returns: v.array(
+    v.object({
+      _id: v.id("posts"),
+      _creationTime: v.number(),
+      title: v.string(),
+      content: v.string(),
+      views: v.number(),
+      subjectId: v.id("subjects"),
+      type: v.union(v.literal("notice"), v.literal("general")),
+      authorId: v.id("users"),
+      author: v.object({
+        _id: v.id("users"),
+        name: v.string(),
+      }),
+      subject: v.object({
+        _id: v.id("subjects"),
+        name: v.string(),
+      }),
+      likeCount: v.number(),
+      isLiked: v.boolean(),
+    })
+  ),
+  handler: async (ctx, args) => {
+    let posts: any[];
+
+    if (args.subjectId) {
+      posts = await ctx.db
+        .query("posts")
+        .withIndex("by_subject", (q) => q.eq("subjectId", args.subjectId!))
+        .order("desc")
+        .take(args.limit || 50);
+    } else if (args.type) {
+      posts = await ctx.db
+        .query("posts")
+        .withIndex("by_type", (q) => q.eq("type", args.type!))
+        .order("desc")
+        .take(args.limit || 50);
+    } else {
+      posts = await ctx.db
+        .query("posts")
+        .order("desc")
+        .take(args.limit || 50);
+    }
+
+    // 현재 사용자 정보 가져오기 (좋아요 상태 확인용)
+    const identity = await ctx.auth.getUserIdentity();
+    let currentUser: any = null;
+
+    if (identity) {
+      currentUser = await ctx.db
+        .query("users")
+        .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+        .unique();
+    }
+
+    // 작성자와 주제 정보를 함께 가져오기
+    const postsWithDetails = await Promise.all(
+      posts.map(async (post: any) => {
+        const author = await ctx.db.get(post.authorId);
+        const subject = await ctx.db.get(post.subjectId);
+
+        if (!author || !subject) {
+          throw new Error("Author or subject not found");
+        }
+
+        // 좋아요 수 계산
+        const likes = await ctx.db
+          .query("likes")
+          .withIndex("by_post", (q) => q.eq("postId", post._id))
+          .collect();
+
+        // 현재 사용자가 좋아요를 눌렀는지 확인
+        let isLiked = false;
+        if (currentUser) {
+          const like = await ctx.db
+            .query("likes")
+            .withIndex("by_user_and_post", (q) =>
+              q.eq("userId", currentUser._id).eq("postId", post._id)
+            )
+            .unique();
+          isLiked = like !== null;
+        }
+
+        return {
+          ...post,
+          author: {
+            _id: author._id,
+            name: (author as any).name,
+          },
+          subject: {
+            _id: subject._id,
+            name: (subject as any).name,
+          },
+          likeCount: likes.length,
+          isLiked,
+        };
+      })
+    );
+
+    return postsWithDetails;
+  },
+});
+
+/**
+ * 특정 사용자가 작성한 게시글 목록을 조회합니다. (페이지네이션 지원)
+ */
+export const listByAuthor = query({
+  args: {
+    authorId: v.id("users"),
+    paginationOpts: paginationOptsValidator,
+  },
+  returns: v.object({
+    page: v.array(
+      v.object({
+        _id: v.id("posts"),
+        _creationTime: v.number(),
+        title: v.string(),
+        content: v.string(),
+        views: v.number(),
+        subjectId: v.id("subjects"),
+        type: v.union(v.literal("notice"), v.literal("general")),
+        authorId: v.id("users"),
+        author: v.object({
+          _id: v.id("users"),
+          name: v.string(),
+        }),
+        subject: v.object({
+          _id: v.id("subjects"),
+          name: v.string(),
+        }),
+        likeCount: v.number(),
+        isLiked: v.boolean(),
+      })
+    ),
+    isDone: v.boolean(),
+    continueCursor: v.union(v.string(), v.null()),
+  }),
+  handler: async (ctx, args) => {
+    const postsResult = await ctx.db
+      .query("posts")
+      .withIndex("by_author", (q) => q.eq("authorId", args.authorId))
+      .order("desc")
+      .paginate(args.paginationOpts);
+
+    const posts = postsResult.page;
+
+    // 현재 사용자 정보 가져오기 (좋아요 상태 확인용)
+    const identity = await ctx.auth.getUserIdentity();
+    let currentUser: any = null;
+
+    if (identity) {
+      currentUser = await ctx.db
+        .query("users")
+        .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+        .unique();
+    }
+
+    // 작성자와 주제 정보를 함께 가져오기
+    const postsWithDetails = await Promise.all(
+      posts.map(async (post: any) => {
+        const author = await ctx.db.get(post.authorId);
+        const subject = await ctx.db.get(post.subjectId);
+
+        if (!author || !subject) {
+          throw new Error("Author or subject not found");
+        }
+
+        // 좋아요 수 계산
+        const likes = await ctx.db
+          .query("likes")
+          .withIndex("by_post", (q) => q.eq("postId", post._id))
+          .collect();
+
+        // 현재 사용자가 좋아요를 눌렀는지 확인
+        let isLiked = false;
+        if (currentUser) {
+          const like = await ctx.db
+            .query("likes")
+            .withIndex("by_user_and_post", (q) =>
+              q.eq("userId", currentUser._id).eq("postId", post._id)
+            )
+            .unique();
+          isLiked = like !== null;
+        }
+
+        return {
+          ...post,
+          author: {
+            _id: author._id,
+            name: (author as any).name,
+          },
+          subject: {
+            _id: subject._id,
+            name: (subject as any).name,
+          },
+          likeCount: likes.length,
+          isLiked,
+        };
+      })
+    );
+
+    return {
+      page: postsWithDetails,
+      isDone: postsResult.isDone,
+      continueCursor: postsResult.continueCursor,
+    };
   },
 });

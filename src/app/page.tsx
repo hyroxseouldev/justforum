@@ -10,22 +10,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { PlusIcon } from "lucide-react";
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationPrevious,
-  PaginationNext,
-  PaginationEllipsis,
-  PaginationLink,
-} from "@/components/ui/pagination";
 import { SignedIn } from "@clerk/nextjs";
-import { fetchQuery } from "convex/nextjs";
-import { api } from "@/convex/_generated/api";
-import PostList from "@/components/post/PostList";
+import PostListWithPagination from "@/components/post/PostListWithPagination";
 
 export default async function Home() {
-  const posts = await fetchQuery(api.posts.list, {});
   return (
     <div className="flex flex-col items-center justify-center h-screen">
       <div className="container max-w-3xl mx-auto">
@@ -75,27 +63,8 @@ export default async function Home() {
               <Input placeholder="검색어 입력" />
             </div>
           </div>
-          {/* Post List */}
-          <PostList posts={posts} />
-          {/* Pagination */}
-          <div className="">
-            <Pagination>
-              <PaginationContent>
-                <PaginationItem>
-                  <PaginationPrevious href="#" />
-                </PaginationItem>
-                <PaginationItem>
-                  <PaginationLink href="#">1</PaginationLink>
-                </PaginationItem>
-                <PaginationItem>
-                  <PaginationEllipsis />
-                </PaginationItem>
-                <PaginationItem>
-                  <PaginationNext href="#" />
-                </PaginationItem>
-              </PaginationContent>
-            </Pagination>
-          </div>
+          {/* Post List with Pagination */}
+          <PostListWithPagination />
         </div>
       </div>
     </div>
