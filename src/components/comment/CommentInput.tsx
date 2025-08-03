@@ -37,7 +37,7 @@ const CommentInput: React.FC<CommentInputProps> = ({
   editInitialContent = "",
   onCancelEdit,
 }) => {
-  const { user, isSignedIn } = useUser();
+  const { isSignedIn } = useUser();
   const [content, setContent] = useState(isEditMode ? editInitialContent : "");
   const [isSubmitting, setIsSubmitting] = useState(false);
 

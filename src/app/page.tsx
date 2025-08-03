@@ -19,19 +19,20 @@ import PostList from "@/components/post/PostList";
 import { api } from "@/convex/_generated/api";
 
 interface HomeProps {
-  searchParams?: {
+  searchParams?: Promise<{
     type?: string;
     search?: string;
     searchType?: "title" | "content";
     page?: string;
-  };
+  }>;
 }
 
 export default async function Home({ searchParams }: HomeProps) {
-  const currentType = searchParams?.type;
-  const searchQuery = searchParams?.search;
-  const searchType = searchParams?.searchType || "title";
-  const currentPage = parseInt(searchParams?.page || "1");
+  const params = await searchParams;
+  const currentType = params?.type;
+  const searchQuery = params?.search;
+  const searchType = params?.searchType || "title";
+  const currentPage = parseInt(params?.page || "1");
   const posts = await fetchQuery(api.posts.list, {
     type: "general",
     subjectId:

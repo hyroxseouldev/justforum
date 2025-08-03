@@ -36,7 +36,7 @@ export const PreventForm: React.FC<PreventFormProps> = ({
 
   // 뒤로가기 방지
   useEffect(() => {
-    const handlePopState = (event: PopStateEvent) => {
+    const handlePopState = () => {
       if (hasUnsavedChanges && !isSubmitting) {
         const confirmed = window.confirm(message);
         if (!confirmed) {

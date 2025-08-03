@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useForm, Controller } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useEditor, EditorContent } from "@tiptap/react";
@@ -17,8 +17,6 @@ import {
   Italic,
   Underline,
   Strikethrough,
-  Type,
-  Palette,
   Link as LinkIcon,
   ImageIcon,
   Loader2,
@@ -28,7 +26,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Id } from "@/convex/_generated/dataModel";
 import { useRouter } from "next/navigation";
 import {
   Form,
@@ -40,7 +37,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import PreventForm from "@/components/ui/prevent-form";
-import { SUBJECTS, SUBJECT_LIST, getSubjectId, Subject } from "@/lib/subjects";
+import { SUBJECT_LIST, getSubjectId, Subject } from "@/lib/subjects";
 
 // 기존의 categories와 subjectId 제거하고 클라이언트용 enum 사용
 const categories = SUBJECT_LIST;
@@ -131,10 +128,9 @@ export const WritePostForm: React.FC = () => {
     handleSubmit,
     watch,
     setValue,
-    formState: { errors, isValid, isDirty },
+    formState: { isValid, isDirty },
   } = form;
 
-  const selectedCategory = watch("category");
   const watchedValues = watch();
 
   // 변경사항 감지
@@ -310,7 +306,7 @@ export const WritePostForm: React.FC = () => {
             <FormField
               control={control}
               name="content"
-              render={({ field }) => (
+              render={() => (
                 <FormItem>
                   <FormLabel>내용</FormLabel>
                   <FormControl>

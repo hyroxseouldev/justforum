@@ -3,7 +3,6 @@ import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import { ko } from "date-fns/locale";
 import { Eye, MessageCircle, MoreHorizontal, Trash2 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,7 +11,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { SUBJECT_INFO } from "@/lib/subjects";
 import { Id } from "@/convex/_generated/dataModel";
 import LikeButton from "@/components/post/LikeButton";
 import SubjectBadge from "@/components/post/SubjectBadge";
@@ -49,7 +47,6 @@ const PostCard: React.FC<PostCardProps> = ({
   title,
   content,
   views,
-  type,
   author,
   subject,
   likeCount,
@@ -63,7 +60,6 @@ const PostCard: React.FC<PostCardProps> = ({
 
   const deletePost = useMutation(api.posts.remove);
 
-  const subjectInfo = SUBJECT_INFO[subject.name as keyof typeof SUBJECT_INFO];
   const formattedDate = formatDistanceToNow(new Date(_creationTime), {
     addSuffix: true,
     locale: ko,
@@ -107,8 +103,6 @@ const PostCard: React.FC<PostCardProps> = ({
     }
   };
 
-  const CardWrapper = detail ? "div" : Link;
-  const cardProps = detail ? {} : { href: `/${_id}` };
 
   return (
     <>

@@ -34,11 +34,8 @@ export const PostItem: React.FC<PostItemProps> = ({
   title,
   content,
   views,
-  type,
   author,
   subject,
-  likeCount,
-  onClick,
   commentCount,
   className = "",
 }) => {
