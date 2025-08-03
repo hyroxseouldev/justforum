@@ -18,15 +18,15 @@ export const SUBJECT_IDS: Record<Subject, Id<"subjects">> = {
 export const SUBJECT_INFO = {
   [SUBJECTS.QUESTION]: {
     label: "질문",
-    color: "text-blue-600",
-    bgColor: "bg-blue-50",
-    borderColor: "border-blue-200",
+    color: "text-gray-600",
+    bgColor: "bg-gray-100",
+    borderColor: "border-gray-200",
   },
   [SUBJECTS.FEEDBACK]: {
     label: "피드백",
-    color: "text-green-600",
-    bgColor: "bg-green-50",
-    borderColor: "border-green-200",
+    color: "text-gray-600",
+    bgColor: "bg-gray-100",
+    borderColor: "border-gray-200",
   },
 } as const;
 

@@ -49,7 +49,7 @@ export const PostItem: React.FC<PostItemProps> = ({
   return (
     <Link
       href={`/${_id}`}
-      className={`flex items-start py-4 border-b border-gray-100 hover:bg-gray-50 transition-colors duration-200 cursor-pointer ${className}`}
+      className={`px-4 flex items-start py-4 border-b border-gray-100 transition-colors duration-200 cursor-pointer ${className}`}
     >
       {/* 왼쪽 카테고리 라벨 */}
       <div className="flex-shrink-0 mr-3">
