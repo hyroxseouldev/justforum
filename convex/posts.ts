@@ -31,6 +31,7 @@ export const list = query({
         name: v.string(),
       }),
       likeCount: v.number(),
+      isLiked: v.boolean(),
     })
   ),
   handler: async (ctx, args) => {
@@ -55,6 +56,17 @@ export const list = query({
         .take(args.limit || 50);
     }
 
+    // 현재 사용자 정보 가져오기 (좋아요 상태 확인용)
+    const identity = await ctx.auth.getUserIdentity();
+    let currentUser: any = null;
+
+    if (identity) {
+      currentUser = await ctx.db
+        .query("users")
+        .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+        .unique();
+    }
+
     // 작성자와 주제 정보를 함께 가져오기
     const postsWithDetails = await Promise.all(
       posts.map(async (post: any) => {
@@ -71,6 +83,18 @@ export const list = query({
           .withIndex("by_post", (q) => q.eq("postId", post._id))
           .collect();
 
+        // 현재 사용자가 좋아요를 눌렀는지 확인
+        let isLiked = false;
+        if (currentUser) {
+          const like = await ctx.db
+            .query("likes")
+            .withIndex("by_user_and_post", (q) =>
+              q.eq("userId", currentUser._id).eq("postId", post._id)
+            )
+            .unique();
+          isLiked = like !== null;
+        }
+
         return {
           ...post,
           author: {
@@ -82,6 +106,7 @@ export const list = query({
             name: (subject as any).name,
           },
           likeCount: likes.length,
+          isLiked,
         };
       })
     );
@@ -92,6 +117,7 @@ export const list = query({
 
 /**
  * 특정 게시글을 조회합니다.
+ * 댓글도 함께 불러옵니다.
  */
 export const get = query({
   args: { postId: v.id("posts") },
@@ -114,6 +140,35 @@ export const get = query({
         name: v.string(),
       }),
       likeCount: v.number(),
+      isLiked: v.boolean(),
+      comments: v.array(
+        v.object({
+          _id: v.id("comments"),
+          _creationTime: v.number(),
+          content: v.string(),
+          authorId: v.id("users"),
+          postId: v.id("posts"),
+          parentId: v.optional(v.id("comments")),
+          author: v.object({
+            _id: v.id("users"),
+            name: v.string(),
+          }),
+          replies: v.array(
+            v.object({
+              _id: v.id("comments"),
+              _creationTime: v.number(),
+              content: v.string(),
+              authorId: v.id("users"),
+              postId: v.id("posts"),
+              parentId: v.optional(v.id("comments")),
+              author: v.object({
+                _id: v.id("users"),
+                name: v.string(),
+              }),
+            })
+          ),
+        })
+      ),
     }),
     v.null()
   ),
@@ -134,6 +189,75 @@ export const get = query({
       .withIndex("by_post", (q) => q.eq("postId", post._id))
       .collect();
 
+    // 현재 사용자가 좋아요를 눌렀는지 확인
+    const identity = await ctx.auth.getUserIdentity();
+    let isLiked = false;
+
+    if (identity) {
+      const user = await ctx.db
+        .query("users")
+        .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+        .unique();
+
+      if (user) {
+        const like = await ctx.db
+          .query("likes")
+          .withIndex("by_user_and_post", (q) =>
+            q.eq("userId", user._id).eq("postId", post._id)
+          )
+          .unique();
+        isLiked = like !== null;
+      }
+    }
+
+    // 댓글 목록 가져오기
+    const topLevelComments = await ctx.db
+      .query("comments")
+      .withIndex("by_post", (q) => q.eq("postId", args.postId))
+      .filter((q) => q.eq(q.field("parentId"), undefined))
+      .order("asc")
+      .collect();
+
+    // 각 최상위 댓글에 대한 대댓글들을 가져오기
+    const commentsWithReplies = await Promise.all(
+      topLevelComments.map(async (comment) => {
+        const commentAuthor = await ctx.db.get(comment.authorId);
+        if (!commentAuthor) throw new Error("Comment author not found");
+
+        // 대댓글들 가져오기
+        const replies = await ctx.db
+          .query("comments")
+          .withIndex("by_parent", (q) => q.eq("parentId", comment._id))
+          .order("asc")
+          .collect();
+
+        // 대댓글들의 작성자 정보 가져오기
+        const repliesWithAuthors = await Promise.all(
+          replies.map(async (reply) => {
+            const replyAuthor = await ctx.db.get(reply.authorId);
+            if (!replyAuthor) throw new Error("Reply author not found");
+
+            return {
+              ...reply,
+              author: {
+                _id: replyAuthor._id,
+                name: replyAuthor.name,
+              },
+            };
+          })
+        );
+
+        return {
+          ...comment,
+          author: {
+            _id: commentAuthor._id,
+            name: commentAuthor.name,
+          },
+          replies: repliesWithAuthors,
+        };
+      })
+    );
+
     return {
       ...post,
       author: {
@@ -145,6 +269,8 @@ export const get = query({
         name: subject.name,
       },
       likeCount: likes.length,
+      isLiked,
+      comments: commentsWithReplies,
     };
   },
 });

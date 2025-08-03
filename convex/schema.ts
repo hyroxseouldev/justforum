@@ -28,11 +28,16 @@ export default defineSchema({
 
   likes: defineTable({
     userId: v.id("users"),
-    postId: v.id("posts"),
+    postId: v.optional(v.id("posts")),
+    commentId: v.optional(v.id("comments")),
+    type: v.union(v.literal("post"), v.literal("comment")),
   })
     .index("by_user", ["userId"])
     .index("by_post", ["postId"])
-    .index("by_user_and_post", ["userId", "postId"]),
+    .index("by_comment", ["commentId"])
+    .index("by_user_and_post", ["userId", "postId"])
+    .index("by_user_and_comment", ["userId", "commentId"])
+    .index("by_type", ["type"]),
 
   comments: defineTable({
     content: v.string(),
