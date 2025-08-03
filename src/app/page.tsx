@@ -22,12 +22,12 @@ import {
 import { SignedIn } from "@clerk/nextjs";
 import { fetchQuery } from "convex/nextjs";
 import { api } from "@/convex/_generated/api";
+import PostList from "@/components/post/PostList";
 
 export default async function Home() {
-  // Get Post
   const posts = await fetchQuery(api.posts.list, {});
   return (
-    <div className="flex flex-col items-center justify-center h-screen pt-20">
+    <div className="flex flex-col items-center justify-center h-screen">
       <div className="container max-w-3xl mx-auto">
         <div className="flex flex-col gap-4">
           {/* Title And Create Button */}
@@ -76,27 +76,7 @@ export default async function Home() {
             </div>
           </div>
           {/* Post List */}
-          <div className="">
-            {!posts || posts.length === 0 ? (
-              <div className="flex flex-col items-center justify-center p-4 min-h-[500px] gap-2">
-                <h3>게시글이 없습니다.</h3>
-                <p>게시글을 작성해주세요.</p>
-                <Link href="/create">
-                  <Button>
-                    <PlusIcon className="w-4 h-4" />
-                    글쓰기
-                  </Button>
-                </Link>
-              </div>
-            ) : (
-              posts.map((post) => (
-                <div key={post._id}>
-                  <h3>{post.title}</h3>
-                  <p>{post.content}</p>
-                </div>
-              ))
-            )}
-          </div>
+          <PostList posts={posts} />
           {/* Pagination */}
           <div className="">
             <Pagination>
