@@ -1,19 +1,53 @@
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Link from "next/link";
-import {
-  Select,
-  SelectContent,
-  SelectTrigger,
-  SelectValue,
-  SelectItem,
-} from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { PlusIcon } from "lucide-react";
 import { SignedIn } from "@clerk/nextjs";
-import PostListWithPagination from "@/components/post/PostListWithPagination";
+import { SearchFilters } from "@/components/post/SearchFilters";
+import { fetchQuery } from "convex/nextjs";
+import { SUBJECT_IDS, SUBJECTS } from "@/lib/subjects";
+import { Button } from "@/components/ui/button";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationPrevious,
+  PaginationNext,
+  PaginationEllipsis,
+  PaginationLink,
+} from "@/components/ui/pagination";
+import PostList from "@/components/post/PostList";
+import { api } from "@/convex/_generated/api";
 
-export default async function Home() {
+interface HomeProps {
+  searchParams?: {
+    type?: string;
+    search?: string;
+    searchType?: "title" | "content";
+    page?: string;
+  };
+}
+
+export default async function Home({ searchParams }: HomeProps) {
+  const currentType = searchParams?.type;
+  const searchQuery = searchParams?.search;
+  const searchType = searchParams?.searchType || "title";
+  const currentPage = parseInt(searchParams?.page || "1");
+  const posts = await fetchQuery(api.posts.list, {
+    type: "general",
+    subjectId:
+      currentType === "question"
+        ? SUBJECT_IDS[SUBJECTS.QUESTION]
+        : currentType === "feedback"
+        ? SUBJECT_IDS[SUBJECTS.FEEDBACK]
+        : undefined,
+    paginationOpts: {
+      numItems: 10,
+      cursor: null,
+    },
+  });
+  const totalCount = posts.totalCount;
+  const totalPages = Math.ceil(totalCount / 10);
+
   return (
     <div className="flex flex-col items-center justify-center h-screen">
       <div className="container max-w-3xl mx-auto">
@@ -33,10 +67,10 @@ export default async function Home() {
           </div>
           {/* Subject Search Params & Search Input */}
           <div className="flex flex-row gap-4 justify-between items-center w-full">
-            <Tabs className="">
+            <Tabs value={currentType || "all"} className="">
               <TabsList className="flex justify-center">
                 <Link href={`/`}>
-                  <TabsTrigger value="" className="">
+                  <TabsTrigger value="all" className="">
                     전체 게시글
                   </TabsTrigger>
                 </Link>
@@ -49,22 +83,127 @@ export default async function Home() {
               </TabsList>
             </Tabs>
 
-            <div className="flex space-x-2">
-              <Select>
-                <SelectTrigger>
-                  <SelectValue placeholder="주제 선택" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="title">제목</SelectItem>
-                  <SelectItem value="content">내용</SelectItem>
-                  <SelectItem value="author">글쓴이</SelectItem>
-                </SelectContent>
-              </Select>
-              <Input placeholder="검색어 입력" />
-            </div>
+            <SearchFilters
+              currentSearchType={searchType}
+              currentSearch={searchQuery}
+              currentType={currentType}
+            />
           </div>
           {/* Post List with Pagination */}
-          <PostListWithPagination />
+          <PostList posts={posts.page} />
+
+          <Pagination>
+            <PaginationContent>
+              {/* Previous Button */}
+              <PaginationItem>
+                <PaginationPrevious
+                  href={
+                    currentPage > 1
+                      ? `/?${new URLSearchParams({
+                          ...(currentType && { type: currentType }),
+                          ...(searchQuery && { search: searchQuery }),
+                          ...(searchType && { searchType }),
+                          page: (currentPage - 1).toString(),
+                        }).toString()}`
+                      : undefined
+                  }
+                  className={
+                    currentPage <= 1 ? "pointer-events-none opacity-50" : ""
+                  }
+                />
+              </PaginationItem>
+
+              {/* First Page */}
+              <PaginationItem>
+                <PaginationLink
+                  href={`/?${new URLSearchParams({
+                    ...(currentType && { type: currentType }),
+                    ...(searchQuery && { search: searchQuery }),
+                    ...(searchType && { searchType }),
+                    page: "1",
+                  }).toString()}`}
+                  isActive={currentPage === 1}
+                >
+                  1
+                </PaginationLink>
+              </PaginationItem>
+
+              {/* Ellipsis after first page if needed */}
+              {currentPage > 4 && totalPages > 5 && (
+                <PaginationItem>
+                  <PaginationEllipsis />
+                </PaginationItem>
+              )}
+
+              {/* Middle pages */}
+              {Array.from({ length: Math.min(3, totalPages - 1) }, (_, i) => {
+                const pageNum = currentPage - 1 + i;
+                if (pageNum > 1 && pageNum < totalPages) {
+                  return (
+                    <PaginationItem key={pageNum}>
+                      <PaginationLink
+                        href={`/?${new URLSearchParams({
+                          ...(currentType && { type: currentType }),
+                          ...(searchQuery && { search: searchQuery }),
+                          ...(searchType && { searchType }),
+                          page: pageNum.toString(),
+                        }).toString()}`}
+                        isActive={currentPage === pageNum}
+                      >
+                        {pageNum}
+                      </PaginationLink>
+                    </PaginationItem>
+                  );
+                }
+                return null;
+              })}
+
+              {/* Ellipsis before last page if needed */}
+              {currentPage < totalPages - 3 && totalPages > 5 && (
+                <PaginationItem>
+                  <PaginationEllipsis />
+                </PaginationItem>
+              )}
+
+              {/* Last Page (if not already shown) */}
+              {totalPages > 1 && (
+                <PaginationItem>
+                  <PaginationLink
+                    href={`/?${new URLSearchParams({
+                      ...(currentType && { type: currentType }),
+                      ...(searchQuery && { search: searchQuery }),
+                      ...(searchType && { searchType }),
+                      page: totalPages.toString(),
+                    }).toString()}`}
+                    isActive={currentPage === totalPages}
+                  >
+                    {totalPages}
+                  </PaginationLink>
+                </PaginationItem>
+              )}
+
+              {/* Next Button */}
+              <PaginationItem>
+                <PaginationNext
+                  href={
+                    currentPage < totalPages
+                      ? `/?${new URLSearchParams({
+                          ...(currentType && { type: currentType }),
+                          ...(searchQuery && { search: searchQuery }),
+                          ...(searchType && { searchType }),
+                          page: (currentPage + 1).toString(),
+                        }).toString()}`
+                      : undefined
+                  }
+                  className={
+                    currentPage >= totalPages
+                      ? "pointer-events-none opacity-50"
+                      : ""
+                  }
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
         </div>
       </div>
     </div>

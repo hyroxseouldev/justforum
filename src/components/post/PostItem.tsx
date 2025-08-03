@@ -24,6 +24,7 @@ export interface PostItemProps {
   likeCount: number;
   onClick?: (id: string) => void;
   className?: string;
+  commentCount: number;
 }
 
 // 포스트 아이템 컴포넌트
@@ -38,6 +39,7 @@ export const PostItem: React.FC<PostItemProps> = ({
   subject,
   likeCount,
   onClick,
+  commentCount,
   className = "",
 }) => {
   // 시간 계산
@@ -63,9 +65,10 @@ export const PostItem: React.FC<PostItemProps> = ({
           <h3 className="text-sm font-medium text-gray-900 truncate hover:text-blue-600 transition-colors">
             {title}
           </h3>
-          {likeCount > 0 && (
+          {/* chagne comment count 0일때는 보이지않음 */}
+          {commentCount > 0 && (
             <span className="ml-2 text-xs font-medium text-red-500">
-              {likeCount}
+              {commentCount}
             </span>
           )}
         </div>

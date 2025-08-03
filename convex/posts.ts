@@ -11,6 +11,8 @@ export const list = query({
   args: {
     subjectId: v.optional(v.id("subjects")),
     type: v.optional(v.union(v.literal("notice"), v.literal("general"))),
+    keyword: v.optional(v.string()),
+    searchType: v.optional(v.union(v.literal("title"), v.literal("content"))),
     paginationOpts: paginationOptsValidator,
   },
   returns: v.object({
@@ -34,26 +36,74 @@ export const list = query({
         }),
         likeCount: v.number(),
         isLiked: v.boolean(),
+        commentCount: v.number(),
       })
     ),
     isDone: v.boolean(),
     continueCursor: v.union(v.string(), v.null()),
+    totalCount: v.number(),
   }),
   handler: async (ctx, args) => {
     let postsQuery;
 
-    if (args.subjectId) {
-      postsQuery = ctx.db
-        .query("posts")
-        .withIndex("by_subject", (q) => q.eq("subjectId", args.subjectId!))
-        .order("desc");
-    } else if (args.type) {
-      postsQuery = ctx.db
-        .query("posts")
-        .withIndex("by_type", (q) => q.eq("type", args.type!))
-        .order("desc");
+    // 키워드 검색이 있는 경우
+    if (args.keyword && args.keyword.trim() !== "") {
+      if (args.searchType === "title") {
+        postsQuery = ctx.db
+          .query("posts")
+          .withSearchIndex("search_title", (q) => {
+            let query = q.search("title", args.keyword!);
+            if (args.subjectId) {
+              query = query.eq("subjectId", args.subjectId);
+            }
+            if (args.type) {
+              query = query.eq("type", args.type);
+            }
+            return query;
+          });
+      } else if (args.searchType === "content") {
+        postsQuery = ctx.db
+          .query("posts")
+          .withSearchIndex("search_content", (q) => {
+            let query = q.search("content", args.keyword!);
+            if (args.subjectId) {
+              query = query.eq("subjectId", args.subjectId);
+            }
+            if (args.type) {
+              query = query.eq("type", args.type);
+            }
+            return query;
+          });
+      } else {
+        // searchType이 지정되지 않은 경우 제목으로 검색
+        postsQuery = ctx.db
+          .query("posts")
+          .withSearchIndex("search_title", (q) => {
+            let query = q.search("title", args.keyword!);
+            if (args.subjectId) {
+              query = query.eq("subjectId", args.subjectId);
+            }
+            if (args.type) {
+              query = query.eq("type", args.type);
+            }
+            return query;
+          });
+      }
     } else {
-      postsQuery = ctx.db.query("posts").order("desc");
+      // 기존 필터링 로직
+      if (args.subjectId) {
+        postsQuery = ctx.db
+          .query("posts")
+          .withIndex("by_subject", (q) => q.eq("subjectId", args.subjectId!))
+          .order("desc");
+      } else if (args.type) {
+        postsQuery = ctx.db
+          .query("posts")
+          .withIndex("by_type", (q) => q.eq("type", args.type!))
+          .order("desc");
+      } else {
+        postsQuery = ctx.db.query("posts").order("desc");
+      }
     }
 
     const postsResult = await postsQuery.paginate(args.paginationOpts);
@@ -86,6 +136,12 @@ export const list = query({
           .withIndex("by_post", (q) => q.eq("postId", post._id))
           .collect();
 
+        // 코멘트 수 계산
+        const comments = await ctx.db
+          .query("comments")
+          .withIndex("by_post", (q) => q.eq("postId", post._id))
+          .collect();
+
         // 현재 사용자가 좋아요를 눌렀는지 확인
         let isLiked = false;
         if (currentUser) {
@@ -110,14 +166,85 @@ export const list = query({
           },
           likeCount: likes.length,
           isLiked,
+          commentCount: comments.length,
         };
       })
     );
+
+    // 전체 게시글 수 계산
+    let totalCount: number;
+
+    if (args.keyword && args.keyword.trim() !== "") {
+      if (args.searchType === "title") {
+        totalCount = await ctx.db
+          .query("posts")
+          .withSearchIndex("search_title", (q) => {
+            let query = q.search("title", args.keyword!);
+            if (args.subjectId) {
+              query = query.eq("subjectId", args.subjectId);
+            }
+            if (args.type) {
+              query = query.eq("type", args.type);
+            }
+            return query;
+          })
+          .collect()
+          .then((posts) => posts.length);
+      } else if (args.searchType === "content") {
+        totalCount = await ctx.db
+          .query("posts")
+          .withSearchIndex("search_content", (q) => {
+            let query = q.search("content", args.keyword!);
+            if (args.subjectId) {
+              query = query.eq("subjectId", args.subjectId);
+            }
+            if (args.type) {
+              query = query.eq("type", args.type);
+            }
+            return query;
+          })
+          .collect()
+          .then((posts) => posts.length);
+      } else {
+        totalCount = await ctx.db
+          .query("posts")
+          .withSearchIndex("search_title", (q) => {
+            let query = q.search("title", args.keyword!);
+            if (args.subjectId) {
+              query = query.eq("subjectId", args.subjectId);
+            }
+            if (args.type) {
+              query = query.eq("type", args.type);
+            }
+            return query;
+          })
+          .collect()
+          .then((posts) => posts.length);
+      }
+    } else if (args.subjectId) {
+      totalCount = await ctx.db
+        .query("posts")
+        .withIndex("by_subject", (q) => q.eq("subjectId", args.subjectId!))
+        .collect()
+        .then((posts) => posts.length);
+    } else if (args.type) {
+      totalCount = await ctx.db
+        .query("posts")
+        .withIndex("by_type", (q) => q.eq("type", args.type!))
+        .collect()
+        .then((posts) => posts.length);
+    } else {
+      totalCount = await ctx.db
+        .query("posts")
+        .collect()
+        .then((posts) => posts.length);
+    }
 
     return {
       page: postsWithDetails,
       isDone: postsResult.isDone,
       continueCursor: postsResult.continueCursor,
+      totalCount,
     };
   },
 });
@@ -441,6 +568,8 @@ export const listSimple = query({
   args: {
     subjectId: v.optional(v.id("subjects")),
     type: v.optional(v.union(v.literal("notice"), v.literal("general"))),
+    keyword: v.optional(v.string()),
+    searchType: v.optional(v.union(v.literal("title"), v.literal("content"))),
     limit: v.optional(v.number()),
   },
   returns: v.array(
@@ -463,28 +592,78 @@ export const listSimple = query({
       }),
       likeCount: v.number(),
       isLiked: v.boolean(),
+      commentCount: v.number(),
     })
   ),
   handler: async (ctx, args) => {
     let posts: any[];
 
-    if (args.subjectId) {
-      posts = await ctx.db
-        .query("posts")
-        .withIndex("by_subject", (q) => q.eq("subjectId", args.subjectId!))
-        .order("desc")
-        .take(args.limit || 50);
-    } else if (args.type) {
-      posts = await ctx.db
-        .query("posts")
-        .withIndex("by_type", (q) => q.eq("type", args.type!))
-        .order("desc")
-        .take(args.limit || 50);
+    // 키워드 검색이 있는 경우
+    if (args.keyword && args.keyword.trim() !== "") {
+      if (args.searchType === "title") {
+        posts = await ctx.db
+          .query("posts")
+          .withSearchIndex("search_title", (q) => {
+            let query = q.search("title", args.keyword!);
+            if (args.subjectId) {
+              query = query.eq("subjectId", args.subjectId);
+            }
+            if (args.type) {
+              query = query.eq("type", args.type);
+            }
+            return query;
+          })
+          .take(args.limit || 50);
+      } else if (args.searchType === "content") {
+        posts = await ctx.db
+          .query("posts")
+          .withSearchIndex("search_content", (q) => {
+            let query = q.search("content", args.keyword!);
+            if (args.subjectId) {
+              query = query.eq("subjectId", args.subjectId);
+            }
+            if (args.type) {
+              query = query.eq("type", args.type);
+            }
+            return query;
+          })
+          .take(args.limit || 50);
+      } else {
+        // searchType이 지정되지 않은 경우 제목으로 검색
+        posts = await ctx.db
+          .query("posts")
+          .withSearchIndex("search_title", (q) => {
+            let query = q.search("title", args.keyword!);
+            if (args.subjectId) {
+              query = query.eq("subjectId", args.subjectId);
+            }
+            if (args.type) {
+              query = query.eq("type", args.type);
+            }
+            return query;
+          })
+          .take(args.limit || 50);
+      }
     } else {
-      posts = await ctx.db
-        .query("posts")
-        .order("desc")
-        .take(args.limit || 50);
+      // 기존 필터링 로직
+      if (args.subjectId) {
+        posts = await ctx.db
+          .query("posts")
+          .withIndex("by_subject", (q) => q.eq("subjectId", args.subjectId!))
+          .order("desc")
+          .take(args.limit || 50);
+      } else if (args.type) {
+        posts = await ctx.db
+          .query("posts")
+          .withIndex("by_type", (q) => q.eq("type", args.type!))
+          .order("desc")
+          .take(args.limit || 50);
+      } else {
+        posts = await ctx.db
+          .query("posts")
+          .order("desc")
+          .take(args.limit || 50);
+      }
     }
 
     // 현재 사용자 정보 가져오기 (좋아요 상태 확인용)
@@ -514,6 +693,12 @@ export const listSimple = query({
           .withIndex("by_post", (q) => q.eq("postId", post._id))
           .collect();
 
+        // 코멘트 수 계산
+        const comments = await ctx.db
+          .query("comments")
+          .withIndex("by_post", (q) => q.eq("postId", post._id))
+          .collect();
+
         // 현재 사용자가 좋아요를 눌렀는지 확인
         let isLiked = false;
         if (currentUser) {
@@ -538,6 +723,7 @@ export const listSimple = query({
           },
           likeCount: likes.length,
           isLiked,
+          commentCount: comments.length,
         };
       })
     );
@@ -575,6 +761,7 @@ export const listByAuthor = query({
         }),
         likeCount: v.number(),
         isLiked: v.boolean(),
+        commentCount: v.number(),
       })
     ),
     isDone: v.boolean(),
@@ -616,6 +803,12 @@ export const listByAuthor = query({
           .withIndex("by_post", (q) => q.eq("postId", post._id))
           .collect();
 
+        // 코멘트 수 계산
+        const comments = await ctx.db
+          .query("comments")
+          .withIndex("by_post", (q) => q.eq("postId", post._id))
+          .collect();
+
         // 현재 사용자가 좋아요를 눌렀는지 확인
         let isLiked = false;
         if (currentUser) {
@@ -640,6 +833,7 @@ export const listByAuthor = query({
           },
           likeCount: likes.length,
           isLiked,
+          commentCount: comments.length,
         };
       })
     );

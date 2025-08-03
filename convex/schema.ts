@@ -24,7 +24,15 @@ export default defineSchema({
   })
     .index("by_subject", ["subjectId"])
     .index("by_author", ["authorId"])
-    .index("by_type", ["type"]),
+    .index("by_type", ["type"])
+    .searchIndex("search_title", {
+      searchField: "title",
+      filterFields: ["type", "subjectId"],
+    })
+    .searchIndex("search_content", {
+      searchField: "content",
+      filterFields: ["type", "subjectId"],
+    }),
 
   likes: defineTable({
     userId: v.id("users"),

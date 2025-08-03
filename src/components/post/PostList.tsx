@@ -18,6 +18,7 @@ interface Post {
   };
   likeCount: number;
   isLiked: boolean;
+  commentCount: number;
 }
 
 interface PaginatedPosts {
