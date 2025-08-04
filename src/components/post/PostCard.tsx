@@ -116,7 +116,7 @@ const PostCard: React.FC<PostCardProps> = ({
             <CardHeader className="p-0 pb-3 border-b">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
-                  <SubjectBadge subjectId={subject._id as Id<"subjects">} />
+                  <SubjectBadge subjectName={subject.name} />
                 </div>
 
                 {/* Delete button - only show in detail mode for post author */}
@@ -201,7 +201,7 @@ const PostCard: React.FC<PostCardProps> = ({
             <CardHeader className="p-0 pb-3 border-b">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
-                  <SubjectBadge subjectId={subject._id as Id<"subjects">} />
+                  <SubjectBadge subjectName={subject.name} />
                 </div>
 
                 {/* Delete button - only show in detail mode for post author */}
