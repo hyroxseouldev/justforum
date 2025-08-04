@@ -1,23 +1,25 @@
 import React from "react";
-import { SUBJECT_INFO, getSubjectById } from "@/lib/subjects";
-import { Id } from "@/convex/_generated/dataModel";
+import { SUBJECT_INFO } from "@/lib/subjects";
 
 interface SubjectBadgeProps {
-  subjectId: Id<"subjects">;
+  subjectName: string;
   className?: string;
 }
 
 const SubjectBadge: React.FC<SubjectBadgeProps> = ({
-  subjectId,
+  subjectName,
   className = "",
 }) => {
-  const subject = getSubjectById(subjectId);
-
-  if (!subject) {
+  // subjectName이 "question" 또는 "feedback"인지 확인
+  if (subjectName !== "question" && subjectName !== "feedback") {
     return null;
   }
 
-  const info = SUBJECT_INFO[subject];
+  const info = SUBJECT_INFO[subjectName as keyof typeof SUBJECT_INFO];
+
+  if (!info) {
+    return null;
+  }
 
   return (
     <span

@@ -1,7 +1,6 @@
 import Link from "next/link";
 import React from "react";
 import SubjectBadge from "./SubjectBadge";
-import { Id } from "@/convex/_generated/dataModel";
 import { formatTimeAgo } from "@/lib/time";
 import { extractPreviewText } from "@/lib/string";
 
@@ -52,7 +51,7 @@ export const PostItem: React.FC<PostItemProps> = ({
     >
       {/* 왼쪽 카테고리 라벨 */}
       <div className="flex-shrink-0 mr-2 sm:mr-3">
-        <SubjectBadge subjectId={subject._id as Id<"subjects">} />
+        <SubjectBadge subjectName={subject.name} />
       </div>
 
       {/* 메인 콘텐츠 영역 */}
@@ -70,8 +69,10 @@ export const PostItem: React.FC<PostItemProps> = ({
         </div>
 
         {/* 미리보기 텍스트 */}
-        <p className="text-xs text-gray-600 line-clamp-2 sm:truncate mb-2">{previewText}</p>
-        
+        <p className="text-xs text-gray-600 line-clamp-2 sm:truncate mb-2">
+          {previewText}
+        </p>
+
         {/* 모바일에서 작성자와 메타데이터 */}
         <div className="flex items-center justify-between text-xs text-gray-500 sm:hidden">
           <span className="truncate">{author.name}</span>

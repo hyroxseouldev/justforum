@@ -4,7 +4,6 @@ import { PlusIcon } from "lucide-react";
 import { SignedIn } from "@clerk/nextjs";
 import { SearchFilters } from "@/components/post/SearchFilters";
 import { fetchQuery } from "convex/nextjs";
-import { SUBJECT_IDS, SUBJECTS } from "@/lib/subjects";
 import { Button } from "@/components/ui/button";
 import {
   Pagination,
@@ -33,13 +32,13 @@ export default async function Home({ searchParams }: HomeProps) {
   const searchQuery = params?.search;
   const searchType = params?.searchType || "title";
   const currentPage = parseInt(params?.page || "1");
-  const posts = await fetchQuery(api.posts.list, {
+  const posts = await fetchQuery(api.posts.listWithSubjectFilter, {
     type: "general",
-    subjectId:
+    subject:
       currentType === "question"
-        ? SUBJECT_IDS[SUBJECTS.QUESTION]
+        ? "question"
         : currentType === "feedback"
-        ? SUBJECT_IDS[SUBJECTS.FEEDBACK]
+        ? "feedback"
         : undefined,
     paginationOpts: {
       numItems: 10,
@@ -55,7 +54,9 @@ export default async function Home({ searchParams }: HomeProps) {
         <div className="flex flex-col gap-4">
           {/* Title And Create Button */}
           <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-between items-start sm:items-center">
-            <h1 className="text-lg sm:text-xl font-bold flex-shrink-0">전체 게시글</h1>
+            <h1 className="text-lg sm:text-xl font-bold flex-shrink-0">
+              전체 게시글
+            </h1>
 
             <SignedIn>
               <Link href="/create" className="w-full sm:w-auto">
@@ -76,10 +77,14 @@ export default async function Home({ searchParams }: HomeProps) {
                   </TabsTrigger>
                 </Link>
                 <Link href={`/?type=question`}>
-                  <TabsTrigger value="question" className="text-xs sm:text-sm">질문</TabsTrigger>
+                  <TabsTrigger value="question" className="text-xs sm:text-sm">
+                    질문
+                  </TabsTrigger>
                 </Link>
                 <Link href={`/?type=feedback`}>
-                  <TabsTrigger value="feedback" className="text-xs sm:text-sm">피드백</TabsTrigger>
+                  <TabsTrigger value="feedback" className="text-xs sm:text-sm">
+                    피드백
+                  </TabsTrigger>
                 </Link>
               </TabsList>
             </Tabs>

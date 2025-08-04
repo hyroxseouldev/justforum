@@ -37,7 +37,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import PreventForm from "@/components/ui/prevent-form";
-import { SUBJECT_LIST, getSubjectId, Subject } from "@/lib/subjects";
+import { SUBJECT_LIST } from "@/lib/subjects";
 
 // 기존의 categories와 subjectId 제거하고 클라이언트용 enum 사용
 const categories = SUBJECT_LIST;
@@ -111,12 +111,12 @@ export const WritePostForm: React.FC = () => {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const router = useRouter();
 
-  const createPost = useMutation(api.posts.create);
+  const createPost = useMutation(api.posts.createWithSubject);
 
   const form = useForm<WritePostFormData>({
     resolver: zodResolver(writePostSchema),
     defaultValues: {
-      category: "질문",
+      category: "question",
       title: "",
       content: "",
     },
@@ -209,7 +209,7 @@ export const WritePostForm: React.FC = () => {
       await createPost({
         title: data.title,
         content: data.content,
-        subjectId: getSubjectId(data.category as Subject),
+        subject: data.category as "question" | "feedback",
         type: "general",
       });
 

@@ -250,6 +250,264 @@ export const list = query({
 });
 
 /**
+ * 모든 게시글 목록을 조회합니다. (페이지네이션 지원)
+ * subject 필터링을 위한 새로운 버전
+ */
+export const listWithSubjectFilter = query({
+  args: {
+    subject: v.optional(v.union(v.literal("question"), v.literal("feedback"))),
+    type: v.optional(v.union(v.literal("notice"), v.literal("general"))),
+    keyword: v.optional(v.string()),
+    searchType: v.optional(v.union(v.literal("title"), v.literal("content"))),
+    paginationOpts: paginationOptsValidator,
+  },
+  returns: v.object({
+    page: v.array(
+      v.object({
+        _id: v.id("posts"),
+        _creationTime: v.number(),
+        title: v.string(),
+        content: v.string(),
+        views: v.number(),
+        subjectId: v.id("subjects"),
+        type: v.union(v.literal("notice"), v.literal("general")),
+        authorId: v.id("users"),
+        author: v.object({
+          _id: v.id("users"),
+          name: v.string(),
+        }),
+        subject: v.object({
+          _id: v.id("subjects"),
+          name: v.string(),
+        }),
+        likeCount: v.number(),
+        isLiked: v.boolean(),
+        commentCount: v.number(),
+      })
+    ),
+    isDone: v.boolean(),
+    continueCursor: v.union(v.string(), v.null()),
+    totalCount: v.number(),
+  }),
+  handler: async (ctx, args) => {
+    let postsQuery;
+
+    // subject 필터링을 위한 subjectId 찾기
+    let subjectId: Id<"subjects"> | undefined;
+    if (args.subject) {
+      const subject = await ctx.db
+        .query("subjects")
+        .withIndex("by_name", (q) => q.eq("name", args.subject!))
+        .unique();
+      if (subject) {
+        subjectId = subject._id;
+      }
+    }
+
+    // 키워드 검색이 있는 경우
+    if (args.keyword && args.keyword.trim() !== "") {
+      if (args.searchType === "title") {
+        postsQuery = ctx.db
+          .query("posts")
+          .withSearchIndex("search_title", (q) => {
+            let query = q.search("title", args.keyword!);
+            if (subjectId) {
+              query = query.eq("subjectId", subjectId);
+            }
+            if (args.type) {
+              query = query.eq("type", args.type);
+            }
+            return query;
+          });
+      } else if (args.searchType === "content") {
+        postsQuery = ctx.db
+          .query("posts")
+          .withSearchIndex("search_content", (q) => {
+            let query = q.search("content", args.keyword!);
+            if (subjectId) {
+              query = query.eq("subjectId", subjectId);
+            }
+            if (args.type) {
+              query = query.eq("type", args.type);
+            }
+            return query;
+          });
+      } else {
+        // searchType이 지정되지 않은 경우 제목으로 검색
+        postsQuery = ctx.db
+          .query("posts")
+          .withSearchIndex("search_title", (q) => {
+            let query = q.search("title", args.keyword!);
+            if (subjectId) {
+              query = query.eq("subjectId", subjectId);
+            }
+            if (args.type) {
+              query = query.eq("type", args.type);
+            }
+            return query;
+          });
+      }
+    } else {
+      // 기존 필터링 로직
+      if (subjectId) {
+        postsQuery = ctx.db
+          .query("posts")
+          .withIndex("by_subject", (q) => q.eq("subjectId", subjectId))
+          .order("desc");
+      } else if (args.type) {
+        postsQuery = ctx.db
+          .query("posts")
+          .withIndex("by_type", (q) => q.eq("type", args.type!))
+          .order("desc");
+      } else {
+        postsQuery = ctx.db.query("posts").order("desc");
+      }
+    }
+
+    const postsResult = await postsQuery.paginate(args.paginationOpts);
+    const posts = postsResult.page;
+
+    // 현재 사용자 정보 가져오기 (좋아요 상태 확인용)
+    const identity = await ctx.auth.getUserIdentity();
+    let currentUser: any = null;
+
+    if (identity) {
+      currentUser = await ctx.db
+        .query("users")
+        .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+        .unique();
+    }
+
+    // 작성자와 주제 정보를 함께 가져오기
+    const postsWithDetails = await Promise.all(
+      posts.map(async (post: any) => {
+        const author = await ctx.db.get(post.authorId);
+        const subject = await ctx.db.get(post.subjectId);
+
+        if (!author || !subject) {
+          throw new Error("Author or subject not found");
+        }
+
+        // 좋아요 수 계산
+        const likes = await ctx.db
+          .query("likes")
+          .withIndex("by_post", (q) => q.eq("postId", post._id))
+          .collect();
+
+        // 코멘트 수 계산
+        const comments = await ctx.db
+          .query("comments")
+          .withIndex("by_post", (q) => q.eq("postId", post._id))
+          .collect();
+
+        // 현재 사용자가 좋아요를 눌렀는지 확인
+        let isLiked = false;
+        if (currentUser) {
+          const like = await ctx.db
+            .query("likes")
+            .withIndex("by_user_and_post", (q) =>
+              q.eq("userId", currentUser._id).eq("postId", post._id)
+            )
+            .unique();
+          isLiked = like !== null;
+        }
+
+        return {
+          ...post,
+          author: {
+            _id: author._id,
+            name: (author as any).name,
+          },
+          subject: {
+            _id: subject._id,
+            name: (subject as any).name,
+          },
+          likeCount: likes.length,
+          isLiked,
+          commentCount: comments.length,
+        };
+      })
+    );
+
+    // 전체 게시글 수 계산
+    let totalCount: number;
+
+    if (args.keyword && args.keyword.trim() !== "") {
+      if (args.searchType === "title") {
+        totalCount = await ctx.db
+          .query("posts")
+          .withSearchIndex("search_title", (q) => {
+            let query = q.search("title", args.keyword!);
+            if (subjectId) {
+              query = query.eq("subjectId", subjectId);
+            }
+            if (args.type) {
+              query = query.eq("type", args.type);
+            }
+            return query;
+          })
+          .collect()
+          .then((posts) => posts.length);
+      } else if (args.searchType === "content") {
+        totalCount = await ctx.db
+          .query("posts")
+          .withSearchIndex("search_content", (q) => {
+            let query = q.search("content", args.keyword!);
+            if (subjectId) {
+              query = query.eq("subjectId", subjectId);
+            }
+            if (args.type) {
+              query = query.eq("type", args.type);
+            }
+            return query;
+          })
+          .collect()
+          .then((posts) => posts.length);
+      } else {
+        totalCount = await ctx.db
+          .query("posts")
+          .withSearchIndex("search_title", (q) => {
+            let query = q.search("title", args.keyword!);
+            if (subjectId) {
+              query = query.eq("subjectId", subjectId);
+            }
+            if (args.type) {
+              query = query.eq("type", args.type);
+            }
+            return query;
+          })
+          .collect()
+          .then((posts) => posts.length);
+      }
+    } else if (subjectId) {
+      totalCount = await ctx.db
+        .query("posts")
+        .withIndex("by_subject", (q) => q.eq("subjectId", subjectId))
+        .collect()
+        .then((posts) => posts.length);
+    } else if (args.type) {
+      totalCount = await ctx.db
+        .query("posts")
+        .withIndex("by_type", (q) => q.eq("type", args.type!))
+        .collect()
+        .then((posts) => posts.length);
+    } else {
+      totalCount = await ctx.db
+        .query("posts")
+        .collect()
+        .then((posts) => posts.length);
+    }
+
+    return {
+      page: postsWithDetails,
+      isDone: postsResult.isDone,
+      continueCursor: postsResult.continueCursor,
+      totalCount,
+    };
+  },
+});
+
+/**
  * 특정 게시글을 조회합니다.
  * 댓글도 함께 불러옵니다.
  */
@@ -443,6 +701,56 @@ export const create = mutation({
       content: args.content,
       views: 0,
       subjectId: args.subjectId,
+      type: args.type,
+      authorId: user._id,
+    });
+  },
+});
+
+/**
+ * 새로운 게시글을 생성합니다. (문자열 기반 subject)
+ * 인증된 사용자만 게시글을 작성할 수 있습니다.
+ */
+export const createWithSubject = mutation({
+  args: {
+    title: v.string(),
+    content: v.string(),
+    subject: v.union(v.literal("question"), v.literal("feedback")),
+    type: v.union(v.literal("notice"), v.literal("general")),
+  },
+  returns: v.id("posts"),
+  handler: async (ctx, args) => {
+    // 현재 인증된 사용자 정보 가져오기
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("인증된 사용자만 게시글을 작성할 수 있습니다.");
+    }
+
+    // 사용자 정보 조회
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+
+    if (!user) {
+      throw new Error("사용자 정보를 찾을 수 없습니다.");
+    }
+
+    // subject 이름으로 subjectId 찾기
+    const subject = await ctx.db
+      .query("subjects")
+      .withIndex("by_name", (q) => q.eq("name", args.subject))
+      .unique();
+
+    if (!subject) {
+      throw new Error("유효하지 않은 주제입니다.");
+    }
+
+    return await ctx.db.insert("posts", {
+      title: args.title,
+      content: args.content,
+      views: 0,
+      subjectId: subject._id,
       type: args.type,
       authorId: user._id,
     });
