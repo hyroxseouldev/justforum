@@ -79,9 +79,9 @@ export function SearchFilters({
   };
 
   return (
-    <div className="flex space-x-2">
+    <div className="flex flex-col sm:flex-row gap-2 w-full">
       <Select value={searchType} onValueChange={setSearchType}>
-        <SelectTrigger className="w-[120px]">
+        <SelectTrigger className="w-full sm:w-[100px] lg:w-[120px]">
           <SelectValue placeholder="검색 유형" />
         </SelectTrigger>
         <SelectContent>
@@ -90,13 +90,13 @@ export function SearchFilters({
         </SelectContent>
       </Select>
 
-      <div className="flex space-x-1">
+      <div className="flex gap-1 w-full sm:w-auto">
         <Input
           placeholder="검색어 입력"
           value={searchValue}
           onChange={(e) => setSearchValue(e.target.value)}
           onKeyPress={handleKeyPress}
-          className="w-[200px]"
+          className="flex-1 sm:w-[150px] lg:w-[200px] min-w-0"
           disabled={isPending}
         />
 
@@ -105,6 +105,7 @@ export function SearchFilters({
           onClick={handleSearch}
           disabled={isPending}
           variant="outline"
+          className="flex-shrink-0"
         >
           <Search className="w-4 h-4" />
         </Button>
@@ -115,6 +116,7 @@ export function SearchFilters({
             onClick={handleClearSearch}
             disabled={isPending}
             variant="ghost"
+            className="flex-shrink-0 text-xs px-2"
           >
             초기화
           </Button>

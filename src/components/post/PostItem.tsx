@@ -48,36 +48,47 @@ export const PostItem: React.FC<PostItemProps> = ({
   return (
     <Link
       href={`/${_id}`}
-      className={`px-4 flex items-start py-4 border-b border-gray-100 transition-colors duration-200 cursor-pointer ${className}`}
+      className={`px-3 sm:px-4 flex items-start py-3 sm:py-4 border-b border-gray-100 transition-colors duration-200 cursor-pointer ${className}`}
     >
       {/* 왼쪽 카테고리 라벨 */}
-      <div className="flex-shrink-0 mr-3">
+      <div className="flex-shrink-0 mr-2 sm:mr-3">
         <SubjectBadge subjectId={subject._id as Id<"subjects">} />
       </div>
 
       {/* 메인 콘텐츠 영역 */}
       <div className="flex-1 min-w-0">
         {/* 제목과 댓글 수 */}
-        <div className="flex items-center mb-1">
-          <h3 className="text-sm font-medium text-gray-900 truncate hover:text-blue-600 transition-colors">
+        <div className="flex items-start sm:items-center mb-1 gap-1">
+          <h3 className="text-sm font-medium text-gray-900 hover:text-blue-600 transition-colors line-clamp-2 sm:truncate">
             {title}
           </h3>
-          {/* chagne comment count 0일때는 보이지않음 */}
           {commentCount > 0 && (
-            <span className="ml-2 text-xs font-medium text-red-500">
+            <span className="text-xs font-medium text-red-500 flex-shrink-0 bg-red-50 px-1.5 py-0.5 rounded">
               {commentCount}
             </span>
           )}
         </div>
 
         {/* 미리보기 텍스트 */}
-        <p className="text-xs text-gray-600 truncate mb-2">{previewText}</p>
+        <p className="text-xs text-gray-600 line-clamp-2 sm:truncate mb-2">{previewText}</p>
+        
+        {/* 모바일에서 작성자와 메타데이터 */}
+        <div className="flex items-center justify-between text-xs text-gray-500 sm:hidden">
+          <span className="truncate">{author.name}</span>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <span className="flex items-center gap-1">
+              <EyeIcon className="w-3 h-3" />
+              {views}
+            </span>
+            <span>{timeAgo}</span>
+          </div>
+        </div>
       </div>
 
-      {/* 오른쪽 메타데이터 */}
-      <div className="flex-shrink-0 text-right text-xs text-gray-500 ml-4">
-        <div className="mb-1">{author.name}</div>
-        <div className="flex items-center justify-end gap-1">
+      {/* 오른쪽 메타데이터 (데스크탑에서만 보임) */}
+      <div className="hidden sm:flex flex-shrink-0 text-right text-xs text-gray-500 ml-4 flex-col items-end">
+        <div className="mb-1 truncate max-w-[100px]">{author.name}</div>
+        <div className="flex items-center justify-end gap-1 whitespace-nowrap">
           <span className="flex items-center gap-1">
             <EyeIcon className="w-3 h-3" />
             {views}

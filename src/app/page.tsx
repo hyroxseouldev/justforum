@@ -50,16 +50,16 @@ export default async function Home({ searchParams }: HomeProps) {
   const totalPages = Math.ceil(totalCount / 10);
 
   return (
-    <div className="flex flex-col items-center justify-center h-screen">
-      <div className="container max-w-3xl mx-auto">
+    <div className="min-h-screen pt-4">
+      <div className="container max-w-4xl mx-auto px-4">
         <div className="flex flex-col gap-4">
           {/* Title And Create Button */}
-          <div className="flex flex-row gap-4 justify-between items-center w-full">
-            <h1 className="text-lg font-bold">전체 게시글</h1>
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-between items-start sm:items-center">
+            <h1 className="text-lg sm:text-xl font-bold flex-shrink-0">전체 게시글</h1>
 
             <SignedIn>
-              <Link href="/create">
-                <Button>
+              <Link href="/create" className="w-full sm:w-auto">
+                <Button className="w-full sm:w-auto">
                   <PlusIcon className="w-4 h-4" />
                   글쓰기
                 </Button>
@@ -67,28 +67,30 @@ export default async function Home({ searchParams }: HomeProps) {
             </SignedIn>
           </div>
           {/* Subject Search Params & Search Input */}
-          <div className="flex flex-row gap-4 justify-between items-center w-full">
-            <Tabs value={currentType || "all"} className="">
-              <TabsList className="flex justify-center">
+          <div className="flex flex-col lg:flex-row gap-4 justify-between items-stretch lg:items-center">
+            <Tabs value={currentType || "all"} className="flex-shrink-0">
+              <TabsList className="grid w-full grid-cols-3 lg:flex lg:w-auto">
                 <Link href={`/`}>
-                  <TabsTrigger value="all" className="">
-                    전체 게시글
+                  <TabsTrigger value="all" className="text-xs sm:text-sm">
+                    전체
                   </TabsTrigger>
                 </Link>
                 <Link href={`/?type=question`}>
-                  <TabsTrigger value="question">질문</TabsTrigger>
+                  <TabsTrigger value="question" className="text-xs sm:text-sm">질문</TabsTrigger>
                 </Link>
                 <Link href={`/?type=feedback`}>
-                  <TabsTrigger value="feedback">피드백</TabsTrigger>
+                  <TabsTrigger value="feedback" className="text-xs sm:text-sm">피드백</TabsTrigger>
                 </Link>
               </TabsList>
             </Tabs>
 
-            <SearchFilters
-              currentSearchType={searchType}
-              currentSearch={searchQuery}
-              currentType={currentType}
-            />
+            <div className="w-full lg:w-auto">
+              <SearchFilters
+                currentSearchType={searchType}
+                currentSearch={searchQuery}
+                currentType={currentType}
+              />
+            </div>
           </div>
           {/* Post List with Pagination */}
           <PostList posts={posts.page} />
